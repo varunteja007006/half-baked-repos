@@ -1,3 +1,5 @@
+> **Archived:** This app now lives in the Buildio monorepo at `apps/eggsy` in `~/Documents/workspace/github/Buildio/buildio_pro`. This copy is kept as an archive and is no longer maintained.
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).

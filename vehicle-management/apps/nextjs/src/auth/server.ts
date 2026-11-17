@@ -1,0 +1,87 @@
+import "server-only";
+
+import { cache } from "react";
+import { headers } from "next/headers";
+import { nextCookies } from "better-auth/next-js";
+import { phoneNumber } from "better-auth/plugins";
+import twilio from "twilio";
+
+import { initAuth } from "@fleetio/auth";
+import { eq } from "@fleetio/db";
+import { db } from "@fleetio/db/client";
+import { app_users } from "@fleetio/db/schema";
+
+import { env } from "~/env";
+
+const baseUrl =
+  env.NODE_ENV === "production"
+    ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000";
+
+// Find your Account SID and Auth Token at twilio.com/console
+// and set the environment variables. See http://twil.io/secure
+const accountSid = env.TWILIO_ACCOUNT_SID;
+const authToken = env.TWILIO_AUTH_TOKEN;
+const fromPhoneNumber = env.TWILIO_FROM_PHONE_NUMBER;
+
+const client = twilio(accountSid, authToken);
+
+export const auth = initAuth({
+  baseUrl,
+  productionUrl: `https://${env.VERCEL_PROJECT_PRODUCTION_URL ?? "fleetio-dev.up.railway.app"}`,
+  secret: env.AUTH_SECRET,
+  extraPlugins: [
+    nextCookies(),
+    phoneNumber({
+      sendOTP: ({ phoneNumber, code }) => {
+        // Implement sending OTP code via SMS
+        if (env.NODE_ENV === "production") {
+          client.messages
+            .create({
+              body: `Your OTP is ${code}`,
+              from: fromPhoneNumber,
+              to: phoneNumber,
+            })
+            .then((res) => {
+              console.log("\n-----------OTP Triggered-------------", res);
+            })
+            .catch((err) => {
+              console.error(
+                "\nFAILED TO SEND OTP" + " " + "sendOTP function",
+                err,
+              );
+            });
+          return;
+        }
+
+        console.log(`\n=======OTP:${code} - ${phoneNumber} =========\n`);
+      },
+      signUpOnVerification: {
+        getTempEmail: (phoneNumber) => {
+          return `${phoneNumber}@my-site.com`;
+        },
+
+        //optionally, you can also pass `getTempName` function to generate a temporary name for the user
+        getTempName: (phoneNumber) => {
+          return phoneNumber; //by default, it will use the phone number as the name
+        },
+      },
+      callbackOnVerification: async (data) => {
+        const userId = data.user.id;
+        const appUser = await db.query.app_users.findFirst({
+          where: eq(app_users.user_id, userId),
+        });
+        // if user not found then add him
+        if (!appUser) {
+          await db.insert(app_users).values({
+            user_id: userId,
+          });
+        }
+      },
+    }),
+  ],
+});
+
+export const getSession = cache(async () =>
+  auth.api.getSession({ headers: await headers() }),
+);

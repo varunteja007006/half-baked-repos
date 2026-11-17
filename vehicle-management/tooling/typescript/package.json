@@ -1,0 +1,7 @@
+{
+  "name": "@fleetio/tsconfig",
+  "private": true,
+  "files": [
+    "*.json"
+  ]
+}
